@@ -2380,6 +2380,32 @@
       .bac-slot, .bac-flip { width: 42px; height: 60px; }
       .bac-chip { width: 36px; height: 36px; font-size: 7px; }
     }
+    [hidden] { display: none !important; }
+    .history-tabs { display:flex; gap:8px; overflow-x:auto; padding:10px 0; margin-bottom:12px; scrollbar-width:thin; }
+    .history-tabs button { flex:0 0 auto; border:1px solid var(--border); border-radius:12px; background:var(--bg-card); color:var(--text-secondary); padding:12px 16px; cursor:pointer; font:inherit; font-size:12px; }
+    .history-tabs button.on { color:var(--cyan); border-color:var(--cyan); background:var(--bg-card-elevated); }
+    .history-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px 0; }
+    .history-summary span { font-size:10px; color:var(--text-secondary); overflow-wrap:anywhere; }
+    .history-summary b { display:block; color:var(--text-primary); font-size:13px; margin-top:5px; }
+    .history-record { padding:16px 0; border-bottom:1px solid var(--border); overflow-wrap:anywhere; font-size:12px; }
+    .history-record p,.history-record small { display:block; margin:8px 0; color:var(--text-secondary); }
+    .request-meta span { display:block; overflow-wrap:anywhere; }
+    .request-meta b { white-space:normal; }
+    .task-photo { width:64px; height:64px; object-fit:cover; border-radius:14px; }
+    .task-preview { box-shadow:0 8px 24px rgba(0,0,0,.12); transition:transform .2s; }
+    .task-preview:hover { transform:translateY(-2px); }
+    #record-detail { margin:auto; width:min(92vw,560px); max-height:85dvh; overflow:auto; color:var(--text-primary); background:var(--bg-card); border:1px solid var(--border); border-radius:22px; padding:22px; }
+    #record-detail::backdrop { background:rgba(8,15,26,.8); }
+    #record-detail h3 { margin-bottom:16px; }
+    .checkin-day15.done .gb-lid { transform:translateY(-7px) rotate(-12deg); }
+    .checkin-day15.done .gb-bow { transform:translate(-50%,-7px) rotate(-12deg); }
+    .gift-box .gb-lid,.gift-box .gb-bow { transition:transform .6s ease; }
+    .checkin-day15.today { box-shadow:inset 0 0 18px rgba(94,234,212,.12),0 8px 18px rgba(0,0,0,.2); }
+    #checkin-btn:disabled { opacity:.75; font-variant-numeric:tabular-nums; cursor:default; }
+    .admin-status.completed,.admin-status.approved { color:var(--success); }
+    .admin-status.failed { color:var(--danger); }
+    @media(max-width:360px) { .checkin-days-15 { gap:4px; } .checkin-day15 { padding:8px 2px; } .admin-list-card { flex-wrap:wrap; } }
+    @media(prefers-reduced-motion:reduce) { .task-preview,.gift-box .gb-lid,.gift-box .gb-bow { transition:none; } }
   </style>
 </head>
 <body>
@@ -3343,12 +3369,13 @@
       </div>
       <div class="card card-elevated" style="margin-bottom:12px;">
         <h2 style="font-size:18px; font-weight:900; color:var(--cyan); margin-bottom:8px;">Task Management</h2>
-        <p style="font-size:11px; color:var(--text-secondary);">Add, edit or delete visiting tasks. Users only see admin tasks. Completed tasks hide for that user only.</p>
+        <div id="task-counters" class="admin-kpi-grid" aria-live="polite"></div><p style="font-size:11px; color:var(--text-secondary);">Add, edit or delete visiting tasks. Users only see admin tasks. Completed tasks hide for that user only.</p>
         <div class="admin-toggle-row"><span>Show Visiting Button</span><button class="admin-switch on" id="visit-visible" type="button" onclick="this.classList.toggle('on')"><i></i></button></div>
         <button class="btn-primary" type="button" onclick="AdminPanel.saveVisitVisible()" style="margin-bottom:8px;">SAVE BUTTON VISIBILITY</button>
       </div>
-      <div class="card" style="margin-bottom:12px;">
-        <div class="form-group"><label class="form-label">Tab</label>
+      <div class="history-tabs" role="tablist" aria-label="Task management"><button id="task-nav-add" role="tab" aria-selected="true" class="on" onclick="AdminPanel.taskPane('add')">Add Task</button><button id="task-nav-list" role="tab" aria-selected="false" onclick="AdminPanel.taskPane('list')">Task List</button></div>
+      <div class="card" id="task-form-pane" style="margin-bottom:12px;">
+        <div class="form-group"><label class="form-label">Category</label>
           <select class="form-select" id="task-tab">
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -3364,9 +3391,9 @@
         <div class="form-group"><label class="form-label">Reward USDT</label><input class="form-input" id="task-reward" type="number" step="0.0001" /></div>
         <div class="form-group"><label class="form-label">Visit Time (seconds)</label><input class="form-input" id="task-time" type="number" step="1" /></div>
         <div class="admin-toggle-row"><span>Active</span><button class="admin-switch on" id="task-active" type="button" onclick="this.classList.toggle('on')"><i></i></button></div>
-        <button class="btn-primary" type="button" onclick="AdminPanel.saveTask()">SAVE TASK</button>
+        <button class="btn-primary" type="button" onclick="AdminPanel.saveTask()">SAVE TASK</button><div class="admin-actions"><button class="btn-secondary" type="button" onclick="AdminPanel.resetTask()">Reset Form</button><button class="btn-secondary" type="button" onclick="AdminPanel.resetTask();AdminPanel.taskPane('list')">Cancel</button></div>
       </div>
-      <div id="admin-task-list"></div>
+      <div id="task-list-pane" hidden><label class="form-label" for="task-search">Search name or task ID</label><input class="form-input" id="task-search" type="search" oninput="AdminPanel.renderTasks()" /><div id="admin-task-list"></div></div>
     </section>
 
     <section id="view-admin-gates" class="view-page">
@@ -3803,6 +3830,7 @@
   </div>
 
   <!-- NOTIFICATION MODAL -->
+  <dialog id="record-detail" aria-labelledby="record-detail-title"><h3 id="record-detail-title">Details</h3><div id="record-detail-body"></div><div id="record-detail-actions" class="admin-actions"></div><button type="button" class="btn-secondary" style="margin-top:12px" onclick="document.getElementById('record-detail').close()">Close</button></dialog>
   <div class="modal-sheet" id="modal-notifications">
     <div class="modal-sheet-content">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -4217,12 +4245,13 @@
       return initial;
     }
     function fmtTime(ts) {
-      return new Date(Number(ts) || Date.now()).toLocaleString();
+      const value = Number(ts);
+      return value > 0 && Number.isFinite(value) ? new Date(value).toLocaleString() : "—";
     }
     function statusClass(st) {
       const s = String(st || "PENDING").toUpperCase();
-      if (s === "CONFIRMED" || s === "COMPLETED") return "confirmed";
-      if (s === "REJECTED" || s === "BLOCKED") return "rejected";
+      if (["CONFIRMED", "COMPLETED", "APPROVED", "SUCCESS"].includes(s)) return "confirmed";
+      if (["REJECTED", "BLOCKED", "FAILED"].includes(s)) return "rejected";
       return "pending";
     }
 
@@ -4563,7 +4592,7 @@
 
         db.ref("userInbox/" + uid).on("value", (snap) => {
           const rows = [];
-          if (snap.exists()) snap.forEach((ch) => { rows.push(Object.assign({ id: ch.key }, ch.val() || {})); });
+          if (snap.exists()) snap.forEach((ch) => { rows.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           rows.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
           State.liveNotifs = rows;
           App.renderNotifications();
@@ -5221,7 +5250,7 @@
         if (!box) return;
         const rows = State.liveNotifs || [];
         if (!rows.length) {
-          box.innerHTML = `<div class="card" style="margin:0;"><h4 style="font-size:12px; font-weight:800;">Welcome</h4><p style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Your account is active. Start mining now.</p></div>`;
+          box.innerHTML = `<div class="card" style="margin:0;"><h4 style="font-size:12px; font-weight:800;">Notifications</h4><p style="font-size:11px; color:var(--text-secondary); margin-top:4px;">No notifications yet.</p></div>`;
           return;
         }
         box.innerHTML = rows.map((n) => `<div class="card" style="margin:0 0 8px;"><h4 style="font-size:12px; font-weight:800;">${escapeHtml(n.title || "Notice")}</h4><p style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${escapeHtml(n.body || "")}</p><div style="font-size:10px; color:var(--text-secondary); margin-top:6px;">${fmtTime(n.timestamp)}</div></div>`).join("");
@@ -7779,6 +7808,7 @@
       },
       async openUser(uid) {
         if (!this.guard()) return;
+        if (this.historyRef && this.historyListener) this.historyRef.off("value", this.historyListener);
         this.target = uid;
         App.navigate("view-admin-user-detail");
         const box = document.getElementById("admin-user-detail");
@@ -7789,13 +7819,14 @@
             db.ref("transactions/" + uid).once("value")
           ]);
           if (!uSnap.exists()) { box.innerHTML = `<p class="admin-empty">User not found</p>`; return; }
+          if (this.target !== uid) return;
           const v = uSnap.val() || {};
           const p = v.profile || {};
           const name = ((p.firstName || "") + " " + (p.lastName || "")).trim() || p.username || uid;
           const usdt = Number((v.tokenBalances && v.tokenBalances.usdt) || 0);
           const refs = Number((v.stats && v.stats.referralCount) || 0);
           const txs = [];
-          if (txSnap.exists()) txSnap.forEach((ch) => txs.push(ch.val() || {}));
+          if (txSnap.exists()) txSnap.forEach((ch) => { txs.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           txs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
           const mining = Object.keys(v.activeMiningRigs || {}).length;
           const blocked = !!v.blocked;
@@ -7825,14 +7856,84 @@
               </div>
               <button class="btn-danger" style="margin-top:8px;" type="button" onclick="AdminPanel.toggleBlock('${escapeHtml(uid)}', ${blocked ? "false" : "true"})">${blocked ? "UNBLOCK ACCOUNT" : "BLOCK ACCOUNT"}</button>
             </div>
-            <div class="card">
-              <h3 style="font-size:14px;font-weight:900;margin-bottom:8px;">Transaction History</h3>
-              ${txs.length ? txs.slice(0, 20).map((tx) => `<div class="admin-detail-row"><span>${escapeHtml(tx.type || "TX")}<br><small>${fmtTime(tx.timestamp)}</small></span><b>${escapeHtml(tx.desc || "")}<br><span class="admin-status ${statusClass(tx.status)}">${escapeHtml(tx.status || "")}</span></b></div>`).join("") : `<p class="admin-empty">No transactions</p>`}
+            <div class="card"><h3>Transaction History</h3><div id="user-history-summary" class="history-summary"></div><div id="user-history-tabs" class="history-tabs" role="tablist" aria-label="Transaction categories"></div><label class="form-label" for="user-history-search">Search transactions</label><input id="user-history-search" class="form-input" type="search" oninput="AdminPanel.historyPage=0;AdminPanel.renderHistory()" /><div id="user-history-records"></div><div id="user-history-pagination" class="admin-actions"></div>
             </div>`;
+          this.historyRows = txs;
+          this.historyCategory = "Visiting";
+          this.historyPage = 0;
+          this.renderHistory();
+          this.historyRef = db.ref("transactions/" + uid);
+          this.historyListener = snap => {
+            if (this.target !== uid) return;
+            const page = document.getElementById("view-admin-user-detail");
+            if (!page || !page.classList.contains("active-view")) return;
+            const updated = [];
+            snap.forEach(child => { updated.push(Object.assign({}, child.val() || {}, { id: child.key })); });
+            this.historyRows = updated.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            this.renderHistory();
+          };
+          this.historyRef.on("value", this.historyListener, () => App.toast("Unable to sync transaction history"));
         } catch (e) {
           box.innerHTML = `<p class="admin-empty">Failed to load user</p>`;
         }
         if (window.lucide) lucide.createIcons();
+      },
+      historyGroup(tx) {
+        const type = String(tx.type || "").toUpperCase();
+        if (/VISIT/.test(type)) return "Visiting";
+        if (/CHECKIN|CHECK_IN/.test(type)) return "Daily Check-in";
+        if (/WITHDRAW|CASHOUT/.test(type)) return "Withdraw";
+        if (/DEPOSIT/.test(type)) return "Deposit";
+        if (/TRANSFER/.test(type)) return "Transfer";
+        if (/SWAP|CONVERT/.test(type)) return "Convert";
+        if (/QUIZ/.test(type)) return "Quiz";
+        if (/MINING|MINE|RIG/.test(type)) return "Mining";
+        if (/CASINO|SICBO|SIC_BO|BACCARAT|CRASH|JHANDI|BET|GAME/.test(type)) return "Casino";
+        if (/AD_|ADS|ADWATCH|WATCH_AD|^AD$/.test(type)) return "Watch Ads";
+        return "Other";
+      },
+      renderHistory() {
+        if (!this.guard()) return;
+        const categories = ["Visiting", "Watch Ads", "Mining", "Daily Check-in", "Quiz", "Casino", "Convert", "Deposit", "Withdraw", "Transfer", "Other"];
+        const rows = this.historyRows || [];
+        const tabs = document.getElementById("user-history-tabs");
+        if (!tabs) return;
+        tabs.replaceChildren();
+        categories.forEach(category => {
+          if (category === "Other" && !rows.some(tx => this.historyGroup(tx) === category)) return;
+          const button = document.createElement("button");
+          button.textContent = category;
+          button.setAttribute("role", "tab");
+          button.setAttribute("aria-selected", String(category === this.historyCategory));
+          button.classList.toggle("on", category === this.historyCategory);
+          button.onclick = () => { this.historyCategory = category; this.historyPage = 0; this.renderHistory(); };
+          tabs.append(button);
+        });
+        const complete = tx => /^(COMPLETED|CONFIRMED|APPROVED|SUCCESS)$/.test(String(tx.status || "").toUpperCase());
+        const earned = rows.filter(tx => complete(tx) && ["Visiting", "Watch Ads", "Mining", "Daily Check-in", "Quiz"].includes(this.historyGroup(tx)));
+        const amountsKnown = earned.every(tx => Number.isFinite(Number(tx.amount)) && tx.amount != null);
+        const withdrawals = rows.filter(tx => complete(tx) && String(tx.type).toUpperCase() === "WITHDRAW");
+        const sum = list => list.reduce((total, tx) => total + Number(tx.amount || 0), 0).toFixed(6);
+        document.getElementById("user-history-summary").innerHTML = `<span>Total transactions<b>${rows.length}</b></span><span>Recorded earnings<b>${amountsKnown ? sum(earned) : "Unavailable in older records"}</b></span><span>Recorded withdrawals<b>${withdrawals.every(tx => tx.amount != null) ? sum(withdrawals) : "Unavailable in older records"}</b></span><span>Last activity<b>${rows.length ? fmtTime(rows[0].timestamp) : "—"}</b></span>`;
+        const query = document.getElementById("user-history-search").value.trim().toLowerCase();
+        const filtered = rows.filter(tx => this.historyGroup(tx) === this.historyCategory && [tx.id, tx.type, tx.desc, tx.status].join(" ").toLowerCase().includes(query));
+        const pages = Math.max(1, Math.ceil(filtered.length / 15));
+        this.historyPage = Math.min(this.historyPage || 0, pages - 1);
+        const records = document.getElementById("user-history-records"); records.replaceChildren();
+        filtered.slice(this.historyPage * 15, this.historyPage * 15 + 15).forEach(tx => {
+          const card = document.createElement("div"); card.className = "history-record";
+          card.innerHTML = `<strong>${escapeHtml(tx.type || "Transaction")}</strong><span class="admin-status ${statusClass(tx.status)}">${escapeHtml(tx.status || "Unknown")}</span><p>${escapeHtml(tx.desc || "")}</p><small>ID: ${escapeHtml(tx.id)} · ${fmtTime(tx.timestamp)}</small><p>Amount: ${tx.amount != null ? escapeHtml(String(tx.amount)) : "Not recorded"}</p>`;
+          const button = document.createElement("button"); button.className = "admin-view-btn"; button.textContent = "Details";
+          button.onclick = () => {
+            document.getElementById("record-detail-title").textContent = "Transaction Details";
+            document.getElementById("record-detail-actions").replaceChildren();
+            document.getElementById("record-detail-body").innerHTML = Object.entries(Object.assign({ userId: this.target }, tx)).map(([key, value]) => `<div class="admin-detail-row"><span>${escapeHtml(key)}</span><b>${escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value ?? "—"))}</b></div>`).join("");
+            document.getElementById("record-detail").showModal();
+          }; card.append(button); records.append(card);
+        });
+        if (!filtered.length) records.innerHTML = '<p class="admin-empty">No recorded transactions in this category</p>';
+        const pagination = document.getElementById("user-history-pagination"); pagination.replaceChildren();
+        [["Previous", -1], ["Next", 1]].forEach(([label, delta]) => { const button = document.createElement("button"); button.className = "btn-secondary"; button.textContent = label + " · " + (this.historyPage + 1) + "/" + pages; button.disabled = this.historyPage + delta < 0 || this.historyPage + delta >= pages; button.onclick = () => { this.historyPage += delta; this.renderHistory(); }; pagination.append(button); });
       },
       async adjust(dir) {
         if (!this.guard() || !this.target) return;
@@ -7873,7 +7974,7 @@
         const fn = kind === "wd" ? "openWithdraw" : "openDeposit";
         return `<div class="admin-list-card">
           <div class="admin-list-photo">${photoOrInitial(r.photoUrl, name)}</div>
-          <div class="admin-list-meta"><b>${escapeHtml(name)}</b><span>${Number(r.amount || 0).toFixed(4)} USDT · <span class="admin-status ${statusClass(r.status)}">${escapeHtml(r.status || "PENDING")}</span></span></div>
+          <div class="admin-list-meta request-meta"><b>${escapeHtml(name)}</b><span>${Number(r.amount || 0).toFixed(4)} USDT · <span class="admin-status ${statusClass(r.status)}">${escapeHtml(r.status || "PENDING")}</span></span><span>User: ${escapeHtml(r.userId || "—")}</span><span>Request: ${escapeHtml(r.id)}</span><span>${escapeHtml(r.method || r.methodName || "—")} · ${fmtTime(r.timestamp || r.createdAt)}</span><span>${kind === "dep" ? "Sender: " + escapeHtml(r.sender || "—") + " · TX: " + escapeHtml(r.txid || "—") : "Account: " + escapeHtml(r.address || "—")}</span></div>
           <button class="admin-view-btn" type="button" onclick="AdminPanel.${fn}('${escapeHtml(r.id)}')">VIEW</button>
         </div>`;
       },
@@ -7882,20 +7983,20 @@
         this.feedsBound = true;
         db.ref("withdrawRequests").on("value", (snap) => {
           const rows = [];
-          snap.forEach((ch) => rows.push(Object.assign({ id: ch.key }, ch.val() || {})));
+          snap.forEach((ch) => { rows.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           rows.sort((a, b) => (b.createdAt || b.timestamp || 0) - (a.createdAt || a.timestamp || 0));
           this.wdCache = rows;
           const page = document.getElementById("view-admin-withdraws");
           if (page && page.classList.contains("active-view")) this.filterWithdraws();
-        });
+        }, () => { this.empty("admin-wd-list", "Unable to sync requests. Reopen this page to retry."); });
         db.ref("depositRequests").on("value", (snap) => {
           const rows = [];
-          snap.forEach((ch) => rows.push(Object.assign({ id: ch.key }, ch.val() || {})));
+          snap.forEach((ch) => { rows.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           rows.sort((a, b) => (b.createdAt || b.timestamp || 0) - (a.createdAt || a.timestamp || 0));
           this.depCache = rows;
           const page = document.getElementById("view-admin-deposits");
           if (page && page.classList.contains("active-view")) this.filterDeposits();
-        });
+        }, () => { this.empty("admin-dep-list", "Unable to sync requests. Reopen this page to retry."); });
       },
       async renderWithdraws() {
         if (!this.guard()) return;
@@ -7904,7 +8005,7 @@
         try {
           const snap = await db.ref("withdrawRequests").once("value");
           const rows = [];
-          snap.forEach((ch) => rows.push(Object.assign({ id: ch.key }, ch.val() || {})));
+          snap.forEach((ch) => { rows.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           rows.sort((a, b) => (b.createdAt || b.timestamp || 0) - (a.createdAt || a.timestamp || 0));
           this.wdCache = rows;
           this.filterWithdraws();
@@ -7913,7 +8014,7 @@
       filterWithdraws() {
         const q = ((document.getElementById("admin-wd-search") || {}).value || "").toLowerCase().trim();
         const list = (this.wdCache || []).filter((r) => {
-          const hay = ((r.firstName || "") + " " + (r.username || "") + " " + (r.userId || "")).toLowerCase();
+          const hay = [r.firstName, r.username, r.userId, r.id, r.txid, r.method, r.status].join(" ").toLowerCase();
           return !q || hay.indexOf(q) >= 0;
         });
         const box = document.getElementById("admin-wd-list");
@@ -7973,7 +8074,7 @@
         try {
           const snap = await db.ref("depositRequests").once("value");
           const rows = [];
-          snap.forEach((ch) => rows.push(Object.assign({ id: ch.key }, ch.val() || {})));
+          snap.forEach((ch) => { rows.push(Object.assign({}, ch.val() || {}, { id: ch.key })); });
           rows.sort((a, b) => (b.createdAt || b.timestamp || 0) - (a.createdAt || a.timestamp || 0));
           this.depCache = rows;
           this.filterDeposits();
@@ -7982,7 +8083,7 @@
       filterDeposits() {
         const q = ((document.getElementById("admin-dep-search") || {}).value || "").toLowerCase().trim();
         const list = (this.depCache || []).filter((r) => {
-          const hay = ((r.firstName || "") + " " + (r.username || "") + " " + (r.userId || "")).toLowerCase();
+          const hay = [r.firstName, r.username, r.userId, r.id, r.txid, r.method, r.status].join(" ").toLowerCase();
           return !q || hay.indexOf(q) >= 0;
         });
         const box = document.getElementById("admin-dep-list");
@@ -8248,13 +8349,44 @@
         ["daily", "weekly", "monthly"].forEach((tab) => {
           (src[tab] || []).forEach((t) => rows.push(Object.assign({ tab }, t)));
         });
-        box.innerHTML = rows.length ? rows.map((t) => `<div class="admin-list-card">
-          <div class="admin-list-meta"><b>${escapeHtml(t.name || "Task")}</b><span>${escapeHtml(t.tab)} · ${Number(t.reward || 0)} USDT · ${Number(t.visitTime || 0)}s · ${t.active === false ? "OFF" : "ON"}</span></div>
-          <button class="admin-view-btn" type="button" onclick="AdminPanel.editTask('${escapeHtml(t.tab)}','${escapeHtml(t.id)}')">EDIT</button>
-          <button class="btn-danger" style="padding:8px 10px;" type="button" onclick="AdminPanel.deleteTask('${escapeHtml(t.tab)}','${escapeHtml(t.id)}')">DEL</button>
-        </div>`).join("") : `<p class="admin-empty">No visiting tasks. Users see an empty list until you add one.</p>`;
+        const active = rows.filter(t => t.active !== false).length;
+        document.getElementById("task-counters").innerHTML = [["Total Tasks", rows.length], ["Active Tasks", active], ["Inactive Tasks", rows.length - active]].map(([label, count]) => `<div class="card"><b>${count}</b><span>${label}</span></div>`).join("");
+        const query = (document.getElementById("task-search").value || "").trim().toLowerCase();
+        const filtered = rows.filter(t => [t.name, t.id].join(" ").toLowerCase().includes(query));
+        box.innerHTML = filtered.length ? filtered.map(t => `<div class="admin-list-card task-preview">
+          ${isHttpUrl(t.img || "") ? `<img class="task-photo" src="${escapeHtml(t.img)}" alt="" loading="lazy" />` : ""}
+          <div class="admin-list-meta"><b>${escapeHtml(t.name || "Task")}</b><span>${escapeHtml(t.tab)} · ${Number(t.reward || 0)} USDT</span><span>${escapeHtml(t.id)} · ${t.active === false ? "Inactive" : "Active"}</span></div>
+          <button class="admin-view-btn" type="button" onclick="AdminPanel.viewTask('${escapeHtml(t.tab)}','${escapeHtml(t.id)}')">View</button>
+        </div>`).join("") : `<p class="admin-empty">${query ? "No matching tasks" : "No tasks added yet"}</p>`;
+      },
+      taskPane(pane) {
+        document.getElementById("task-form-pane").hidden = pane !== "add";
+        document.getElementById("task-list-pane").hidden = pane !== "list";
+        ["add", "list"].forEach(key => {
+          const button = document.getElementById("task-nav-" + key);
+          button.classList.toggle("on", key === pane);
+          button.setAttribute("aria-selected", String(key === pane));
+        });
+      },
+      resetTask() {
+        ["edit-id", "name", "title", "desc", "img", "link", "reward", "time"].forEach(key => document.getElementById("task-" + key).value = "");
+        document.getElementById("task-tab").value = "daily";
+        document.getElementById("task-active").classList.add("on");
+      },
+      viewTask(tab, id) {
+        if (!this.guard()) return;
+        const task = ((((LiveConfig.data || {}).visitTasks || {})[tab]) || []).find(t => t.id === id);
+        if (!task) { App.toast("Task no longer available"); return; }
+        const modal = document.getElementById("record-detail");
+        document.getElementById("record-detail-title").textContent = "Task Details";
+        document.getElementById("record-detail-body").innerHTML = Object.entries({"Task name": task.name, "Task ID": task.id, Category: tab, Description: task.desc, URL: task.link, Reward: task.reward, Currency: "USDT", "Completion time (seconds)": task.visitTime, Status: task.active === false ? "Inactive" : "Active"}).map(([key, value]) => `<div class="admin-detail-row"><span>${escapeHtml(key)}</span><b>${escapeHtml(String(value ?? "—"))}</b></div>`).join("");
+        const actions = document.getElementById("record-detail-actions"); actions.replaceChildren();
+        [["Edit Task", () => { modal.close(); this.editTask(tab, id); }], ["Delete Task", () => { modal.close(); this.deleteTask(tab, id); }]].forEach(([label, action]) => { const button = document.createElement("button"); button.className = "btn-secondary"; button.textContent = label; button.onclick = action; actions.append(button); });
+        modal.showModal();
       },
       editTask(tab, id) {
+        if (!this.guard()) return;
+        this.taskPane("add");
         const list = ((((LiveConfig.data || {}).visitTasks) || {})[tab]) || [];
         const t = list.find((x) => x.id === id) || {};
         document.getElementById("task-tab").value = tab;
@@ -8365,7 +8497,7 @@
         this.confirm("Send to all users", "This notice will appear in every user notification bar.", async () => {
           const snap = await db.ref("users").once("value");
           const jobs = [];
-          snap.forEach((ch) => jobs.push(this.inbox(ch.key, "Admin Notice", msg)));
+          snap.forEach((ch) => { jobs.push(this.inbox(ch.key, "Admin Notice", msg)); });
           await Promise.all(jobs);
           await NotificationDispatcher.notifyAll("ADMIN BROADCAST", msg);
           App.toast("Broadcast sent");
